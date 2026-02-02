@@ -45,6 +45,7 @@ export class LotteryMachine {
     this._initDrum();
     this._animate = this._animate.bind(this);
     this._onResize = this._onResize.bind(this);
+    this._onResize();          // initial sizing — must come after scene/camera init
     window.addEventListener("resize", this._onResize);
     this._animate();
   }
@@ -65,7 +66,6 @@ export class LotteryMachine {
     r.shadowMap.enabled = true;
     r.shadowMap.type = THREE.PCFSoftShadowMap;
     this._renderer = r;
-    this._onResize();
   }
 
   _initScene() {
