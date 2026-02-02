@@ -6,24 +6,32 @@ import { LotteryMachine } from "./machine.js";
 import * as storage from "./storage.js";
 import { UI } from "./ui.js";
 
-async function boot() {
-  const canvas = document.getElementById("machine-canvas");
-  if (!canvas) { console.error("Canvas not found"); return; }
+const $loading = document.getElementById("loading-msg");
 
-  /* 1. Get the full country list */
-  const countries = getAllCountries();
-
-  /* 2. Create the 3D lottery machine */
-  const machine = new LotteryMachine(canvas);
-
-  /* 3. Add all country balls */
-  machine.addBalls(countries);
-
-  /* 4. Wire UI */
-  const ui = new UI({ machine, storage, allCountries: countries });
-
-  /* 5. Restore persisted state (remove already-skipped/accepted balls) */
-  await ui.restore();
+function showError(err) {
+  console.error(err);
+  if ($loading) {
+    $loading.textContent = "Failed to load: " + (err?.message || err);
+    $loading.style.color = "#e05252";
+  }
 }
 
-boot().catch(console.error);
+async function boot() {
+  try {
+    const canvas = document.getElementById("machine-canvas");
+    if (!canvas) throw new Error("Canvas element not found");
+
+    const countries = getAllCountries();
+    const machine = new LotteryMachine(canvas);
+    machine.addBalls(countries);
+
+    const ui = new UI({ machine, storage, allCountries: countries });
+    await ui.restore();
+
+    if ($loading) $loading.hidden = true;
+  } catch (err) {
+    showError(err);
+  }
+}
+
+boot();

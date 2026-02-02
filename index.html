@@ -9,9 +9,9 @@
   <script type="importmap">
   {
     "imports": {
-      "three": "https://unpkg.com/three@0.160.0/build/three.module.js",
-      "three/addons/": "https://unpkg.com/three@0.160.0/examples/jsm/",
-      "cannon-es": "https://unpkg.com/cannon-es@0.20.0/dist/cannon-es.js"
+      "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+      "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/",
+      "cannon-es": "https://esm.sh/cannon-es@0.20.0"
     }
   }
   </script>
@@ -28,6 +28,7 @@
     <!-- 3D Scene -->
     <section class="scene-panel" aria-label="Lottery machine">
       <canvas id="machine-canvas"></canvas>
+      <div id="loading-msg" class="loading-msg">Loading 3D scene...</div>
 
       <div id="selection-overlay" class="selection-overlay hidden" role="alert" aria-live="assertive">
         <p class="selected-country-name" id="selected-name"></p>
