@@ -1,0 +1,9 @@
+{
+  "name": "tasty-planet",
+  "version": "1.0.0",
+  "private": true,
+  "description": "A photorealistic 3D country lottery machine",
+  "dependencies": {
+    "@netlify/blobs": "^8.1.0"
+  }
+}
