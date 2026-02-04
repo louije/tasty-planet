@@ -128,9 +128,9 @@ export class LotteryMachine {
     key.shadow.radius = 4;
     scene.add(key);
 
-    scene.add(Object.assign(new THREE.DirectionalLight(0xaaccff, 0.4), {
-      position: new THREE.Vector3(-3, 4, -3),
-    }));
+    const fill = new THREE.DirectionalLight(0xaaccff, 0.4);
+    fill.position.set(-3, 4, -3);
+    scene.add(fill);
 
     /* Spotlight for winner */
     const spot = new THREE.SpotLight(0xffe8b0, 0, 14, Math.PI * 0.18, 0.7, 1.2);
@@ -572,7 +572,7 @@ export class LotteryMachine {
 
   _highlightWinner(ball) {
     ball.mesh.scale.setScalar(1.8);
-    ball.mesh.material.emissive = ball.mesh.material.color;
+    ball.mesh.material.emissive.copy(ball.mesh.material.color);
     ball.mesh.material.emissiveIntensity = 0.4;
     this._spotLight.intensity = 4;
     this._spotLight.target = ball.mesh;
