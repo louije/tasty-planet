@@ -335,4 +335,20 @@ details summary {
   color: var(--text-dim);
   font-size: 0.9rem;
   z-index: 5;
+  pointer-events: none;
 }
+.loading-msg[hidden] { display: none; }
+
+/* --- Shake hint --- */
+.shake-hint {
+  position: absolute;
+  top: 1rem;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 0.85rem;
+  color: var(--gold);
+  opacity: 0.8;
+  z-index: 10;
+  pointer-events: none;
+}
+.shake-hint[hidden] { display: none; }

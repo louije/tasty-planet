@@ -4,19 +4,12 @@
 import { countryColorCSS } from "./countries.js";
 
 export class UI {
-  /**
-   * @param {object} deps
-   * @param {import('./machine.js').LotteryMachine} deps.machine
-   * @param {object} deps.storage  — { loadState, saveAction, resetState }
-   * @param {{ code: string, name: string, continent: string }[]} deps.allCountries
-   */
   constructor({ machine, storage, allCountries }) {
     this._machine = machine;
     this._storage = storage;
     this._all = allCountries;
-    this._pending = null; // country waiting for skip/accept
+    this._pending = null;
 
-    /* DOM refs */
     this.$remaining    = document.getElementById("remaining-count");
     this.$overlay      = document.getElementById("selection-overlay");
     this.$name         = document.getElementById("selected-name");
@@ -25,34 +18,79 @@ export class UI {
     this.$btnSkip      = document.getElementById("btn-skip");
     this.$btnAccept    = document.getElementById("btn-accept");
     this.$btnReset     = document.getElementById("btn-reset");
-    this.$btnTest      = document.getElementById("btn-test-rng");
-    this.$rngOut       = document.getElementById("rng-output");
     this.$acceptedList = document.getElementById("accepted-list");
     this.$acceptedEmpty= document.getElementById("accepted-empty");
     this.$skippedList  = document.getElementById("skipped-list");
     this.$skippedCount = document.getElementById("skipped-count");
+    this.$shakeHint    = document.getElementById("shake-hint");
 
     this._bind();
+    this._initAccel();
   }
 
   _bind() {
-    this.$btnSpin.addEventListener("click", () => this._spin());
+    /* Spin button: press-and-hold to shake, release to open trapdoor.
+       Quick tap falls back to auto-spin. */
+    let pressTimer = null;
+    let held = false;
+
+    this.$btnSpin.addEventListener("pointerdown", (e) => {
+      e.preventDefault();
+      if (this._machine.isSpinning) return;
+      held = false;
+      pressTimer = setTimeout(() => {
+        held = true;
+        this._machine.startShake();
+        this._shakeLoop();
+        this.$btnSpin.textContent = "Release!";
+      }, 200);
+    });
+
+    const onRelease = () => {
+      clearTimeout(pressTimer);
+      if (held) {
+        held = false;
+        this._machine.release();
+        this.$btnSpin.textContent = "Shake";
+        this.$btnSpin.disabled = true;
+      }
+    };
+    this.$btnSpin.addEventListener("pointerup", onRelease);
+    this.$btnSpin.addEventListener("pointerleave", onRelease);
+
+    // Quick tap → auto spin
+    this.$btnSpin.addEventListener("click", () => {
+      if (held) return;
+      if (this._machine.isSpinning) return;
+      this._hideOverlay();
+      this._machine.clearHighlight();
+      this.$btnSpin.disabled = true;
+      this._machine.spin();
+    });
+
     this.$btnSkip.addEventListener("click", () => this._decide("skip"));
     this.$btnAccept.addEventListener("click", () => this._decide("accept"));
     this.$btnReset.addEventListener("click", () => this._reset());
-    this.$btnTest.addEventListener("click", () => this._testRNG());
 
     this._machine.onSelect((country) => this._onCountrySelected(country));
   }
 
-  /* ---- actions ---- */
+  /** Continuous random shaking while holding the button */
+  _shakeLoop() {
+    if (this._machine._state !== "shaking") return;
+    this._machine.applyShake(
+      (Math.random() - 0.5) * 2,
+      (Math.random() - 0.3) * 1.5,
+      (Math.random() - 0.5) * 2,
+    );
+    requestAnimationFrame(() => this._shakeLoop());
+  }
 
-  _spin() {
-    if (this._machine.isSpinning) return;
-    this._hideOverlay();
-    this._machine.clearHighlight();
-    this.$btnSpin.disabled = true;
-    this._machine.spin();
+  async _initAccel() {
+    const ok = await this._machine.enableAccelerometer();
+    if (ok && this.$shakeHint) {
+      this.$shakeHint.hidden = false;
+    }
   }
 
   _onCountrySelected(country) {
@@ -61,6 +99,7 @@ export class UI {
     this.$continent.textContent = country.continent;
     this._showOverlay();
     this.$btnSpin.disabled = false;
+    this.$btnSpin.textContent = "Shake";
   }
 
   async _decide(action) {
@@ -68,16 +107,12 @@ export class UI {
     const c = this._pending;
     this._pending = null;
     this._hideOverlay();
-    this._machine.clearHighlight();
     this._machine.removeBall(c.code);
+    this._machine.resetAfterSelection();
 
     await this._storage.saveAction(action, c.code);
-
-    if (action === "accept") {
-      this._addToAccepted(c);
-    } else {
-      this._addToSkipped(c);
-    }
+    if (action === "accept") this._addToAccepted(c);
+    else this._addToSkipped(c);
     this._updateCount();
   }
 
@@ -86,8 +121,6 @@ export class UI {
     await this._storage.resetState();
     location.reload();
   }
-
-  /* ---- rendering ---- */
 
   _addToAccepted(c) {
     this.$acceptedEmpty.hidden = true;
@@ -116,67 +149,19 @@ export class UI {
     this.$overlay.classList.add("hidden");
   }
 
-  /* ---- restore persisted state ---- */
   async restore() {
     const state = await this._storage.loadState();
-
-    const skipSet = new Set(state.skipped);
-    const acceptSet = new Set(state.accepted);
-
-    // Remove persisted countries from the machine
-    for (const code of [...skipSet, ...acceptSet]) {
+    for (const code of [...state.skipped, ...state.accepted]) {
       this._machine.removeBall(code);
     }
-
-    // Render accepted list (most recent first)
     for (const code of [...state.accepted].reverse()) {
-      const c = this._all.find((x) => x.code === code);
+      const c = this._all.find(x => x.code === code);
       if (c) this._addToAccepted(c);
     }
-
-    // Render skipped list
     for (const code of state.skipped) {
-      const c = this._all.find((x) => x.code === code);
+      const c = this._all.find(x => x.code === code);
       if (c) this._addToSkipped(c);
     }
-
     this._updateCount();
-  }
-
-  /* ---- Randomness test ---- */
-  _testRNG() {
-    const N = 100_000;
-    const buckets = 197;
-    const counts = new Array(buckets).fill(0);
-    const arr = new Uint32Array(1);
-
-    for (let i = 0; i < N; i++) {
-      // Same algorithm as machine._cryptoRandomIndex
-      const mask = (1 << Math.ceil(Math.log2(buckets))) - 1;
-      let val;
-      do {
-        crypto.getRandomValues(arr);
-        val = arr[0] & mask;
-      } while (val >= buckets);
-      counts[val]++;
-    }
-
-    const expected = N / buckets;
-    let chiSq = 0;
-    let min = Infinity, max = -Infinity;
-    for (const c of counts) {
-      chiSq += (c - expected) ** 2 / expected;
-      if (c < min) min = c;
-      if (c > max) max = c;
-    }
-
-    // chi-squared critical value for df=196, alpha=0.05 ≈ 232.9
-    const pass = chiSq < 233;
-
-    this.$rngOut.textContent =
-      `Chi-squared test (${N.toLocaleString()} draws, ${buckets} buckets):\n` +
-      `  X² = ${chiSq.toFixed(2)}  (critical ≈ 233)\n` +
-      `  min = ${min}, max = ${max}, expected ≈ ${expected.toFixed(1)}\n` +
-      `  Result: ${pass ? "PASS — distribution is uniform" : "FAIL — investigate"}`;
   }
 }

@@ -11,7 +11,7 @@ const $loading = document.getElementById("loading-msg");
 function showError(err) {
   console.error(err);
   if ($loading) {
-    $loading.textContent = "Failed to load: " + (err?.message || err);
+    $loading.textContent = String(err?.message || err);
     $loading.style.color = "#e05252";
   }
 }
@@ -25,10 +25,11 @@ async function boot() {
     const machine = new LotteryMachine(canvas);
     machine.addBalls(countries);
 
+    // Scene is rendering — hide loading immediately
+    if ($loading) $loading.hidden = true;
+
     const ui = new UI({ machine, storage, allCountries: countries });
     await ui.restore();
-
-    if ($loading) $loading.hidden = true;
   } catch (err) {
     showError(err);
   }
